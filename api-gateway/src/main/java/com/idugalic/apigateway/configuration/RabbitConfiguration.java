@@ -1,19 +1,26 @@
 package com.idugalic.apigateway.configuration;
 
-import org.axonframework.contextsupport.spring.AnnotationDriven;
+import org.axonframework.amqp.eventhandling.DefaultAMQPMessageConverter;
+import org.axonframework.amqp.eventhandling.spring.SpringAMQPMessageSource;
+import org.axonframework.serialization.Serializer;
+
+import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.FanoutExchange;
+import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
-import org.springframework.amqp.rabbit.core.RabbitAdmin;
-import org.springframework.beans.factory.annotation.Required;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+
+import com.rabbitmq.client.Channel;
 
 @Configuration
-@AnnotationDriven
 public class RabbitConfiguration {
 
     @Value("${spring.rabbitmq.hostname}")
@@ -59,6 +66,7 @@ public class RabbitConfiguration {
         return new Binding(queueName, Binding.DestinationType.QUEUE, projectExchangeName, "*.*", null);
     }
 
+    @Profile("!cloud")
     @Bean
     ConnectionFactory connectionFactory() {
         CachingConnectionFactory connectionFactory = new CachingConnectionFactory(hostname);
@@ -66,17 +74,27 @@ public class RabbitConfiguration {
         connectionFactory.setPassword(password);
         return connectionFactory;
     }
-
-    @Bean
-    @Required
-    RabbitAdmin rabbitAdmin() {
-        RabbitAdmin admin = new RabbitAdmin(connectionFactory());
-        admin.setAutoStartup(true);
+   
+    
+    @Autowired
+    void rabbitAdmin(AmqpAdmin admin, ConnectionFactory connectionFactory) {
         admin.declareExchange(blogEventBusExchange());
         admin.declareQueue(eventStream());
         admin.declareBinding(blogBinding());
         admin.declareExchange(projectEventBusExchange());
         admin.declareBinding(projectBinding());
-        return admin;
+    }
+   
+    @Bean
+    public SpringAMQPMessageSource messageSourceApiGateway(Serializer serializer) {
+        return new SpringAMQPMessageSource(new DefaultAMQPMessageConverter(serializer)) {
+
+            @RabbitListener(queues = "${spring.application.queue}")
+            @Override
+            public void onMessage(Message message, Channel channel) throws Exception {
+                super.onMessage(message, channel);
+            }
+        };
     }
 }
+

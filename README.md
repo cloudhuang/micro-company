@@ -1,6 +1,72 @@
-# Application 'Micro Company' ![status](https://travis-ci.org/idugalic/micro-company.svg?branch=master)
+# [projects](http://idugalic.github.io/projects)/micro-company ![Java CI with Maven](https://github.com/idugalic/micro-company/workflows/Java%20CI%20with%20Maven/badge.svg?branch=master)
 
-This project is intended to demonstrate end-to-end best practices for building a cloud native, event driven microservice architecture using Spring Cloud.
+This project is intended to demonstrate end-to-end best practices for building a cloud native, event driven microservice architecture using [Spring Cloud](https://spring.io/projects/spring-cloud) and [Axon](https://axoniq.io/).
+
+## Table of Contents
+
+   * [Application 'Micro Company'](#application-micro-company-)
+      * [What is cloud native](#what-is-cloud-native)
+      * [Architecture](#architecture)
+         * [Patterns and techniques:](#patterns-and-techniques)
+         * [Technologies](#technologies)
+         * [Key benefits](#key-benefits)
+         * [How it works](#how-it-works)
+         * [Services](#services)
+            * [Backing services](#backing-services)
+               * [(Service) Registry](#service-registry)
+               * [Authorization server (Oauth2)](#authorization-server-oauth2)
+               * [Configuration server](#configuration-server)
+               * [API Gateway](#api-gateway)
+            * [Backend Microservices](#backend-microservices)
+               * [BlogMicroservice](#blogmicroservice)
+               * [ProjectMicroservice](#projectmicroservice)
+               * [Admin server (<a href="http://codecentric.github.io/spring-boot-admin/1.3.2/">http://codecentric.github.io/spring-boot-admin/1.3.2/</a>)](#admin-server-httpcodecentricgithubiospring-boot-admin132)
+      * [Running instructions](#running-instructions)
+         * [Prerequisite](#prerequisite)
+         * [Step 1: Clone the project](#step-1-clone-the-project)
+         * [Step 2 (Optional): Build the project](#step-2-optional-build-the-project)
+            * [Build the project](#build-the-project)
+            * [Build docker images via maven](#build-docker-images-via-maven)
+         * [Step 3: Run the application as](#step-3-run-the-application-as)
+            * [Run monolithic on localhost](#run-monolithic-on-localhost)
+               * [Docker](#docker)
+               * [Maven](#maven)
+               * [Eclipse](#eclipse)
+            * [Run microservices on localhost via docker](#run-microservices-on-localhost-via-docker)
+            * [Run microservices on Docker Swarm (mode) - Local cluster](#run-microservices-on-docker-swarm-mode---local-cluster)
+            * [Run microservices on Docker Swarm (mode) - AWS cluster](#run-microservices-on-docker-swarm-mode---aws-cluster)
+            * [Run microservices on Pivotal Cloud Foundry - PCF Dev](#run-microservices-on-pivotal-cloud-foundry---pcf-dev)
+               * [CLI](#cli)
+               * [Eclipse](#eclipse-1)
+         * [Issuing Commands &amp; Queries with CURL](#issuing-commands--queries-with-curl)
+            * [Create Blog post](#create-blog-post)
+                  * [Microservices](#microservices)
+                  * [Monolithic](#monolithic)
+            * [Publish Blog post](#publish-blog-post)
+                  * [Microservices](#microservices-1)
+                  * [Monolithic](#monolithic-1)
+            * [Query Blog posts](#query-blog-posts)
+                  * [Microservices](#microservices-2)
+                  * [Monolithic](#monolithic-2)
+            * [Create Project](#create-project)
+                  * [Microservices](#microservices-3)
+                  * [Monolithic](#monolithic-3)
+            * [Query Projects](#query-projects)
+                  * [Microservices](#microservices-4)
+                  * [Monolithic](#monolithic-4)
+            * [WebSocket on the gateway](#websocket-on-the-gateway)
+                  * [Microservices](#microservices-5)
+      * [About AXON](#about-axon)
+         * [Commands](#commands)
+         * [Events](#events)
+         * [Domain](#domain)
+         * [Repositories](#repositories)
+         * [Event Stores](#event-stores)
+         * [Event Bus](#event-bus)
+         * [Sagas](#sagas)
+         * [Testing](#testing)
+         * [Spring support](#spring-support)
+      * [References and further reading](#references-and-further-reading)
 
 ## What is cloud native
 
@@ -15,24 +81,24 @@ The microservice architectural style is an approach to developing a single appli
 
 Microservices enable businesses to innovate faster and stay ahead of the competition. But one major challenge with the microservices architecture is the management of distributed data. Each microservice has its own private database. It is difficult to implement business transactions that maintain data consistency across multiple services as well as queries that retrieve data from multiple services.
 
-![Microservice Architecture - Ivan Dugalic](https://i.imgsafe.org/cb15eb4553.png)
+![Microservice Architecture - Ivan Dugalic](micro-company.PNG)
 
 ### Patterns and techniques:
 
 1. Microservices
 2. Command and Query Responsibility Separation (CQRS)
-3. DDD - Event Sourcing
+3. Event Sourcing
 4. DDD - Agregates
 
 ### Technologies
 
-- [Spring Boot](http://projects.spring.io/spring-boot/) (v1.3.8.RELEASE)
-- [Spring Cloud](http://projects.spring.io/spring-cloud/)
-- [Spring Data](http://projects.spring.io/spring-data/)
+- [Spring Boot](http://projects.spring.io/spring-boot/) (v1.5.3.RELEASE)
+- [Spring Cloud](http://projects.spring.io/spring-cloud/) (Dalston.RELEASE)
+- [Spring Data](http://projects.spring.io/spring-data/) (train: Ingalls-SR3)
 - [Spring Data REST](http://projects.spring.io/spring-data-rest/)
-- [Axon Framework](http://www.axonframework.org/) (v2.4)
+- [Axon Framework](http://www.axonframework.org/) (v3.0.4)
 - [RabbitMQ](https://www.rabbitmq.com/) (v3.5.4) Axon supports any Spring AMQP supported platform.
-- [MongoDB](https://www.mongodb.com/) (v.2.14) Axon also supports JDBC & JPA based event-stores.
+- [Docker](https://www.docker.com/) (v17.05.0-ce-mac11)
 
 
 ### Key benefits
@@ -49,13 +115,13 @@ The domain is literally split into a *command-side* microservice application and
 
 Communication between the two microservices is `event-driven` and the demo uses RabbitMQ messaging as a means of passing the events between processes (VM's).
 
-The **command-side** processes commands. Commands are actions which change state in some way. The execution of these commands results in `Events` being generated which are persisted by Axon (using MongoDB) and propagated out to other VM's (as many VM's as you like) via RabbitMQ messaging. In event-sourcing, events are the sole records in the system. They are used by the system to describe and re-build aggregates on demand, one event at a time.
+The **command-side** processes commands. Commands are actions which change state in some way. The execution of these commands results in `Events` being generated which are persisted by Axon  and propagated out to other VM's (as many VM's as you like) via RabbitMQ messaging. In event-sourcing, events are the sole records in the system. They are used by the system to describe and re-build aggregates on demand, one event at a time.
 
 The **query-side** is an event-listener and processor. It listens for the `Events` and processes them in whatever way makes the most sense. In this application, the query-side just builds and maintains a *materialised view* which tracks the state of the individual agregates (Product, Blog, Customer, ...). The query-side can be replicated many times for scalability and the messages held by the RabbitMQ queues are durable, so they can be temporarily stored on behalf of the event-listener if it goes down.
 
 The command-side and the query-side both have REST API's which can be used to access their capabilities.
 
-Read the [Axon documentation](http://www.axonframework.org/download/) for the finer details of how Axon generally operates to bring you CQRS and Event Sourcing to your apps, as well as lots of detail on how it all get's configured (spoiler: it's mostly spring-context XML for the setup and some Java extensions and annotations within the code).
+Read the [Axon documentation](https://docs.axoniq.io/reference-guide/) for the finer details of how Axon generally operates to bring you CQRS and Event Sourcing to your apps, as well as lots of detail on how it all get's configured.
 
 ### Services
 
@@ -112,21 +178,42 @@ $ git clone https://github.com/idugalic/micro-company.git
 ### Step 2 (Optional): Build the project
 Please note that images are available on the docker hub (https://hub.docker.com/u/idugalic), so if you do not want to build the services, simply skip to Step 3
 
-Build the project:
+#### Build the project
  
 ```bash
 $ cd micro-company
 $ mvn clean install
 ```
 
+#### Build docker images via maven
+
+```bash
+$ DOCKER_HOST=unix:///var/run/docker.sock mvn docker:build
+```
+
+or to build and push images via maven (requires username and password of docker repo):
+
+```bash
+$ DOCKER_HOST=unix:///var/run/docker.sock mvn docker:build -DpushImage
+```
 ### Step 3: Run the application as
 
 - monolithic on localhost or
-- microservices on localhost or
-- microservices on swarm (mode) local cluster
-- microservices on swarm (mode) AWS cluster
+- microservices on localhost via docker or
+- microservices on docker swarm (mode) - local cluster
+- microservices on docker swarm (mode) - AWS cluster
+- microservices on Pivotal Cloud Foundry - PCF Dev
 
 #### Run monolithic on localhost
+
+This version of the application is deployed as a single monolithic application.
+
+Domain Driven Design is applied through Event Sourcing and CQRS. How Event Sourcing enables deployment flexibility - the application can be deployed as a monolith.
+
+The domain is literally split into a command-side component and a query-side component (this is CQRS in its most literal form).
+
+Communication between the two components is event-driven and the demo uses simple event store (Database in this case - JPA) as a means of passing the events between components. RabbitMQ is not needed in this case.
+
 
 ##### Docker
 ```bash
@@ -144,68 +231,129 @@ $ mvn spring-boot:run
 Run as Spring Boot Project. 
 I can advice for Boot Dashboard to be used as well.
 
-#### Run microservices on localhost
+#### Run microservices on localhost via docker
 
 ```bash
 $ cd micro-company/docker
 $ docker-compose up -d 
 ```
 
-#### Run microservices on Swarm (mode) local cluster (docker 1.12+ BETA is required !!!)
+#### Run microservices on Docker Swarm (mode) - Local cluster
 
-Docker Engine 1.12 includes swarm mode for natively managing a cluster of Docker Engines called a swarm. https://docs.docker.com/engine/swarm
+Docker Engine 1.12+ includes swarm mode for natively managing a cluster of Docker Engines called a swarm. https://docs.docker.com/engine/swarm
 
 ```bash
 $ cd micro-company/docker
 $ . ./swarm-mode-local.sh
 ```
-By executing command/script you will:
+By executing this script you will:
 
 - create 4 virtual machines (VirtualBox is required). One 'swarm master', and three 'swarm nodes'
 - initialize cluster on the swarm master
 - join nodes to the cluster
-- create a stack by deploying distributed bundle
+- deploy services using a `docker-compose.yml` file directly
 
 Please, follow the instructions in the console log, and have fun :)
 
-#### Run microservices on Swarm (mode) AWS cluster (docker 1.12+ BETA is required !!!)
+##### Experimental features
 
-Docker Engine 1.12 includes swarm mode for natively managing a cluster of Docker Engines called a swarm. https://docs.docker.com/engine/swarm
+- Aggregated logs of a service
+- Docker build has a new experimental --squash
 
-We will deploy services on AWS infrastucture. So you have to prepare it:
+In version 1.13 the experimental features are now part of the standard binaries and can be enabled by running the Deamon with the --experimental flag. Let’s do just this. First we need to change the dockerd profile and add the flag:
+```bash
+$ docker-machine ssh swmaster -t sudo vi /var/lib/boot2docker/profile
+```
+add the --experimental flag to the EXTRA_ARGS variable. In my case the file looks like this after the modification
+```
+EXTRA_ARGS='
+--label provider=virtualbox
+--experimental
 
-- Step1:  Register for AWS - beta (https://beta.docker.com/docs/).
-- Step2:  Login to your account as a root, and create user (not root) that will be used latter. (http://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html#id_users_create_console)
-- Step3:  Create Your Key Pair Using Amazon EC2. Please not that the key will be downloaded by the browser. In my case it is '/Users/idugalic/.ssh/idugalic.pem'. (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html#having-ec2-create-your-key-pair).
-- Step4:  Once You have registered for Docker AWS Beta, create stack on AWS by using CloudFormation template - Follow the instructions in the email from Docker.
-- Step 5 Run the script bellow and follow instructions.
+'
+```
+Save the changes as reboot the leader node:
+```bash
+docker-machine stop swmaster
+docker-machine start swmaster
+```
 
+#### Run microservices on Docker Swarm (mode) - AWS cluster
+
+Docker Engine 1.12+ includes swarm mode for natively managing a cluster of Docker Engines called a swarm. https://docs.docker.com/engine/swarm
+
+We will deploy services on AWS infrastucture. You have to prepare it.
+Please note that steps 1 and 3 are optional. You don't have to create users or key pars if you already have them.
+
+- Step 1: Login to your AWS account as a root, and create user (not root) that will be used latter. Follow the [guide.](http://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html#id_users_create_console)
+- Step 2: [Login](https://signin.aws.amazon.com/console/) with your new user account.
+- Step 3: [Create Your Key Pair Using Amazon EC2.](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html#having-ec2-create-your-key-pair) Please note that the key will be downloaded by the browser. In my case it is '/Users/idugalic/.ssh/idugalic.pem'.
+- Step 4: Create stack on AWS by using [CloudFormation template](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=Docker&templateURL=https://editions-us-east-1.s3.amazonaws.com/aws/stable/Docker.tmpl)
+- Step 5: Run the shell script bellow and follow instructions.
 
 ```bash
 $ cd micro-company/docker
 $ . ./swarm-mode-aws.sh
 ```
 
+#### Run microservices on Pivotal Cloud Foundry - PCF Dev
+Run services on local workstation with PCF Dev
+
+- Download and install PCF: https://pivotal.io/platform/pcf-tutorials/getting-started-with-pivotal-cloud-foundry-dev/introduction
+- Start PCF Dev: `$ cf dev start -m 8192 `
+- Login to PCF Dev" `$ cf login -a https://api.local.pcfdev.io --skip-ssl-validation -u admin -p admin -o pcfdev-org`
+- Create user service - configserver: `$ cf cups configserver -p '{"uri":"http://configserver.local.pcfdev.io"}'`
+- Create user service - registry: `$ cf cups registry -p '{"uri":"http://registry.local.pcfdev.io"}'`
+- Create user service - authserver: `$ cf cups authserver -p '{"uri":"http://authserver.local.pcfdev.io"}'`
+- Create cloud foundry service instance - mysql: `$ cf create-service p-mysql 512mb mysql`
+- Create cloud foundry service instance - rabbit: `$ cf create-service p-rabbitmq standard rabbit`
+- Open your browser and point to https://local.pcfdev.io. Explore !
+
+
+##### CLI
+Push microservices in command line:
+
+```bash
+$ cd micro-company/
+$ mvn clean install
+$ cf push -f configserver/manifest.yml -p configserver/target/configserver-0.0.1-SNAPSHOT.jar
+$ cf push -f registry/manifest.yml -p registry/target/registry-0.0.1-SNAPSHOT.jar
+$ cf push -f authserver/manifest.yml -p authserver/target/authserver-0.0.1-SNAPSHOT.jar
+$ cf push -f command-side-blog-service/manifest.yml -p command-side-blog-service/target/command-side-blog-service-0.0.1-SNAPSHOT.jar
+$ cf push -f command-side-project-service/manifest.yml -p command-side-project-service/target/command-side-project-service-0.0.1-SNAPSHOT.jar
+$ cf push -f query-side-blog-service/manifest.yml -p query-side-blog-service/target/query-side-blog-service-0.0.1-SNAPSHOT.jar
+$ cf push -f query-side-project-service/manifest.yml -p query-side-project-service/target/query-side-project-service-0.0.1-SNAPSHOT.jar
+$ cf push -f api-gateway/manifest.yml -p api-gateway/target/api-gateway-0.0.1-SNAPSHOT.jar
+$ cf push -f adminserver/manifest.yml -p adminserver/target/adminserver-1.3.3.RELEASE.jar
+
+```
+
+##### Eclipse
+Push microservices with 'Boot Dashboard':
+
+- Add local (dev) cloud foundry target (https://api.local.pcfdev.io).
+- Once you are connected, start dragging the projects to this instance.
+
+
+NOTE: Please run 'configserver' first, followed by 'registry' and other services.
+
 ### Issuing Commands & Queries with CURL
-My current docker host IP is 127.0.0.1
 
 #### Create Blog post
 
 ###### Microservices
 
 ```bash
-$ curl -H "Content-Type: application/json" -X POST -d '{"title":"xyz","rawContent":"xyz","publicSlug": "publicslug","draft": true,"broadcast": true,"category": "ENGINEERING", "publishAt": "2016-12-23T14:30:00+00:00"}' http://127.0.0.1:8080/blogpostcommands
-
-```
-or on gateway:
-
-```bash
 $ curl -H "Content-Type: application/json" -X POST -d '{"title":"xyz","rawContent":"xyz","publicSlug": "publicslug","draft": true,"broadcast": true,"category": "ENGINEERING", "publishAt": "2016-12-23T14:30:00+00:00"}' http://127.0.0.1:9000/command/blog/blogpostcommands 
 
 ```
+or on the PCF:
+```bash
+$ curl -H "Content-Type: application/json" -X POST -d '{"title":"xyz","rawContent":"xyz","publicSlug": "publicslug","draft": true,"broadcast": true,"category": "ENGINEERING", "publishAt": "2016-12-23T14:30:00+00:00"}' api-gateway.local.pcfdev.io/command/blog/blogpostcommands 
+```
 ###### Monolithic
 ```bash
-$ curl -H "Content-Type: application/json" -X POST -d '{"title":"xyz","rawContent":"xyz","publicSlug": "publicslug","draft": true,"broadcast": true,"category": "ENGINEERING", "publishAt": "2016-12-23T14:30:00+00:00"}' http://127.0.0.1:8080/blogpostcommands
+$ curl -H "Content-Type: application/json" -X POST -d '{"title":"xyz","rawContent":"xyz","publicSlug": "publicslug","draft": true,"broadcast": true,"category": "ENGINEERING", "publishAt": "2016-12-23T14:30:00+00:00"}' http://127.0.0.1:8080/api/blogpostcommands
 
 ```
 
@@ -214,47 +362,35 @@ $ curl -H "Content-Type: application/json" -X POST -d '{"title":"xyz","rawConten
 ###### Microservices
 
 ```bash
-$ curl -H "Content-Type: application/json" -X POST -d '{"publishAt": "2016-12-23T14:30:00+00:00"}' http://127.0.0.1:8080/blogpostcommands/{id}/publishcommand
-
-```
-or on gateway:
-
-```bash
 $ curl -H "Content-Type: application/json" -X POST -d '{"publishAt": "2016-12-23T14:30:00+00:00"}' http://127.0.0.1:9000/command/blog/blogpostcommands/{id}/publishcommand
 
 ```
 ###### Monolithic
 
 ```bash
-$ curl -H "Content-Type: application/json" -X POST -d '{"publishAt": "2016-12-23T14:30:00+00:00"}' http://127.0.0.1:8080/blogpostcommands/{id}/publishcommand
+$ curl -H "Content-Type: application/json" -X POST -d '{"publishAt": "2016-12-23T14:30:00+00:00"}' http://127.0.0.1:8080/api/blogpostcommands/{id}/publishcommand
 
 ```
 
 #### Query Blog posts
 
 ###### Microservices
-```bash
-$ curl http://127.0.0.1:8081/blogposts
-```
-or on gateway:
 
 ```bash
 $ curl http://127.0.0.1:9000/query/blog/blogposts
 ```
+or on the PCF:
+```bash
+$ curl api-gateway.local.pcfdev.io/query/blog/blogposts
+```
 ###### Monolithic
 ```bash
-$ curl http://127.0.0.1:8080/blogposts
+$ curl http://127.0.0.1:8080/api/blogposts
 ```
 
 #### Create Project
 
 ###### Microservices
-```bash
-$ curl -H "Content-Type: application/json" -X POST -d '{"name":"Name","repoUrl":"URL","siteUrl": "siteUrl","description": "sdfsdfsdf"}' http://127.0.0.1:8082/projectcommands
-
-```
-
-or on gateway:
 
 ```bash
 $ curl -H "Content-Type: application/json" -X POST -d '{"name":"Name","repoUrl":"URL","siteUrl": "siteUrl","description": "sdfsdfsdf"}' http://127.0.0.1:9000/command/project/projectcommands
@@ -263,29 +399,26 @@ $ curl -H "Content-Type: application/json" -X POST -d '{"name":"Name","repoUrl":
 ###### Monolithic
 
 ```bash
-$ curl -H "Content-Type: application/json" -X POST -d '{"name":"Name","repoUrl":"URL","siteUrl": "siteUrl","description": "sdfsdfsdf"}' http://127.0.0.1:8080/projectcommands
+$ curl -H "Content-Type: application/json" -X POST -d '{"name":"Name","repoUrl":"URL","siteUrl": "siteUrl","description": "sdfsdfsdf"}' http://127.0.0.1:8080/api/projectcommands
 
 ```
 #### Query Projects
 
 ###### Microservices
-```bash
-$ curl http://127.0.0.1:8083/projects
-```
- or on gateway:
  
  ```bash
 $ curl http://127.0.0.1:9000/query/project/projects
 ```
 ###### Monolithic
 ```bash
-$ curl http://127.0.0.1:8080/projects
+$ curl http://127.0.0.1:8080/api/projects
 ```
 
 #### WebSocket on the gateway
 
 ###### Microservices
 All the events will be sent to browser via WebSocket and displayed on http://127.0.0.1:9000/socket/index.html
+or on the PCF: http://api-gateway.local.pcfdev.io/socket/index.html
 
 
 ## About AXON
@@ -362,18 +495,31 @@ Of course, you should also test your Sagas. There is a special Annotated Saga Te
 
 Those days, each mature framework in Java world should have some sort of Spring support. Each of Axon's components can be configured as a Spring bean. Axon provides also a namespace shortcut for almost everything it has, so the configuration is as short as it has to be.
 
+## The lab
+This project has been migrated to a github organization http://ivans-innovation-lab.github.io/. There we can practice the Twelve-Factor App methodology.
+
+You will learn how we:
+
+- made decisions to use one pattern against the other,
+- changed architecture, organization (culture) and process over time to respond to new requirements,
+- made a foundation for successful digitalization.
+
+The ultimate goal is to deliver better software faster. Today, that invariably means continuous delivery – for an installed product – or continuous deployment for an -aaS product.
+
+The source code is hosted on Github: https://github.com/ivans-innovation-lab
+
 ## References and further reading
 
   * http://martinfowler.com/articles/microservices.html
   * http://microservices.io/
-  * http://www.slideshare.net/chris.e.richardson/developing-eventdriven-microservices-with-event-sourcing-and-cqrs-phillyete
   * http://12factor.net/
   * http://pivotal.io/platform/migrating-to-cloud-native-application-architectures-ebook
   * http://pivotal.io/beyond-the-twelve-factor-app
   * http://www.infoq.com/news/2016/01/cqrs-axon-example
-  * http://www.axonframework.org
-  * http://blog.arungupta.me/docker-swarm-cluster-using-consul/
-  * https://blog.docker.com/2016/02/containers-as-a-service-caas/
+  * https://www.infoq.com/articles/microservices-aggregates-events-cqrs-part-2-richardson
+  * https://axoniq.io/
+  * http://blog.arungupta.me/deploy-docker-compose-services-swarm/
   * http://www.kennybastani.com/2016/04/event-sourcing-microservices-spring-cloud.html
   * https://benwilcock.wordpress.com/2016/06/20/microservices-with-spring-boot-axon-cqrses-and-docker/
+  
   

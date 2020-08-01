@@ -7,10 +7,12 @@ spring:
       server:
         git:
           uri: https://github.com/idugalic/micro-company-config.git
+          default-label: axon3-boot
+      label: axon3-boot
     
 security:
   user:
     password: password
     
 server:
-  port: 8888 
+  port: ${PORT:8888} 
